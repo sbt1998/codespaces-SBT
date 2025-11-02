@@ -1,0 +1,252 @@
+// ...existing code...
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Generador de Curriculum</title>
+  <style>
+    :root{--accent:#0b67ff;--muted:#666;--bg:#f6f8fb}
+    body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0; background:var(--bg); color:#111}
+    .wrap{display:flex; gap:20px; padding:20px; max-width:1200px; margin:0 auto}
+    form{width:420px; background:#fff; padding:18px; border-radius:8px; box-shadow:0 6px 18px rgba(12,20,40,.06); overflow:auto; max-height:86vh}
+    .preview{flex:1; background:#fff; padding:28px; border-radius:8px; box-shadow:0 6px 18px rgba(12,20,40,.06); max-height:86vh; overflow:auto}
+    label{display:block; font-size:13px; margin-top:12px; color:var(--muted)}
+    input[type="text"], input[type="email"], textarea, select{width:100%; padding:8px 10px; margin-top:6px; border:1px solid #e3e6ee; border-radius:6px; font-size:14px}
+    textarea{min-height:80px; resize:vertical}
+    .row{display:flex; gap:8px}
+    .btn{display:inline-block; background:var(--accent); color:#fff; padding:8px 12px; border-radius:6px; border:none; cursor:pointer; margin-top:12px}
+    .btn.secondary{background:#6b7280}
+    .section{margin-top:18px; padding-top:12px; border-top:1px dashed #e6e9f2}
+    .small{font-size:13px; color:var(--muted)}
+    .entry{border:1px solid #eef2ff; padding:8px; border-radius:6px; margin-top:8px; background:#fbfdff}
+    .controls{display:flex; gap:8px; margin-top:8px}
+    /* preview styles */
+    .cv{max-width:800px; margin:0 auto; color:#111}
+    .cv-header{display:flex; justify-content:space-between; align-items:center; gap:18px; border-bottom:2px solid #eef2ff; padding-bottom:12px}
+    .name{font-size:28px; font-weight:700}
+    .meta{color:var(--muted); font-size:14px}
+    .section-preview{margin-top:16px}
+    .section-preview h3{margin:0 0 6px 0; font-size:16px; color:var(--accent)}
+    .item-title{font-weight:600}
+    @media print{
+      body{background:#fff}
+      .wrap > *:not(.preview){display:none}
+      .preview{box-shadow:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <form id="editor" onsubmit="return false;">
+      <h2>Editor de Curriculum</h2>
+
+      <label>Nombre completo
+        <input id="name" type="text" placeholder="Ej. María Pérez">
+      </label>
+
+      <label>Profesión / Título
+        <input id="title" type="text" placeholder="Ej. Ingeniera de software">
+      </label>
+
+      <label>Contacto (email, teléfono, ubicación)
+        <input id="contact" type="text" placeholder="email · teléfono · ciudad">
+      </label>
+
+      <label>Resumen / Perfil
+        <textarea id="summary" placeholder="Breve resumen profesional"></textarea>
+      </label>
+
+      <div class="section">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <h3 style="margin:0">Experiencia</h3>
+          <button class="btn secondary" id="add-experience">Añadir</button>
+        </div>
+        <div id="experiences"></div>
+      </div>
+
+      <div class="section">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <h3 style="margin:0">Educación</h3>
+          <button class="btn secondary" id="add-education">Añadir</button>
+        </div>
+        <div id="educations"></div>
+      </div>
+
+      <div class="section">
+        <label>Habilidades (separadas por comas)
+          <input id="skills" type="text" placeholder="Ej. JavaScript, React, SQL">
+        </label>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="update">Actualizar vista</button>
+        <button class="btn secondary" id="print">Imprimir / Exportar PDF</button>
+        <button class="btn secondary" id="download">Descargar HTML</button>
+      </div>
+
+      <p class="small">Consejo: añade varias experiencias y educación; la vista previa se actualiza con "Actualizar vista".</p>
+    </form>
+
+    <div class="preview">
+      <div id="preview" class="cv">
+        <!-- Vista previa generada -->
+        <div class="cv-header">
+          <div>
+            <div class="name" id="pv-name">Tu Nombre</div>
+            <div class="meta" id="pv-title">Título profesional</div>
+          </div>
+          <div class="meta" id="pv-contact">contacto · ciudad</div>
+        </div>
+
+        <div class="section-preview" id="pv-summary">
+          <h3>Perfil</h3>
+          <div id="pv-summary-text" class="small">Breve resumen profesional.</div>
+        </div>
+
+        <div class="section-preview" id="pv-experience">
+          <h3>Experiencia</h3>
+          <div id="pv-experience-list"></div>
+        </div>
+
+        <div class="section-preview" id="pv-education">
+          <h3>Educación</h3>
+          <div id="pv-education-list"></div>
+        </div>
+
+        <div class="section-preview" id="pv-skills">
+          <h3>Habilidades</h3>
+          <div id="pv-skills-list" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // utilidades
+    const el = id => document.getElementById(id);
+
+    // plantillas para entradas
+    function makeExperience(id, data = {}) {
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.dataset.id = id;
+      div.innerHTML = `
+        <label>Puesto
+          <input class="exp-role" type="text" placeholder="Ej. Desarrollador Frontend" value="${data.role||''}">
+        </label>
+        <div class="row">
+          <label style="flex:1">Empresa
+            <input class="exp-company" type="text" value="${data.company||''}">
+          </label>
+          <label style="flex:1">Fechas
+            <input class="exp-dates" type="text" placeholder="2020 - 2022" value="${data.dates||''}">
+          </label>
+        </div>
+        <label>Descripción
+          <textarea class="exp-desc" placeholder="Responsabilidades y logros">${data.desc||''}</textarea>
+        </label>
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px">
+          <button class="btn secondary remove-exp">Eliminar</button>
+        </div>
+      `;
+      div.querySelector('.remove-exp').onclick = () => div.remove();
+      return div;
+    }
+
+    function makeEducation(id, data = {}) {
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.dataset.id = id;
+      div.innerHTML = `
+        <div class="row">
+          <label style="flex:1">Título
+            <input class="edu-degree" type="text" placeholder="Ej. Lic. Informática" value="${data.degree||''}">
+          </label>
+          <label style="flex:1">Institución
+            <input class="edu-school" type="text" value="${data.school||''}">
+          </label>
+        </div>
+        <label>Fechas y notas
+          <input class="edu-dates" type="text" placeholder="2015 - 2019" value="${data.dates||''}">
+        </label>
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px">
+          <button class="btn secondary remove-edu">Eliminar</button>
+        </div>
+      `;
+      div.querySelector('.remove-edu').onclick = () => div.remove();
+      return div;
+    }
+
+    // manejo del DOM
+    let expCount = 0, eduCount = 0;
+    const experiences = el('experiences'), educations = el('educations');
+
+    el('add-experience').onclick = (e) => { e.preventDefault(); experiences.appendChild(makeExperience(++expCount)); }
+    el('add-education').onclick = (e) => { e.preventDefault(); educations.appendChild(makeEducation(++eduCount)); }
+
+    // actualizar vista previa
+    function updatePreview() {
+      el('pv-name').textContent = el('name').value || 'Tu Nombre';
+      el('pv-title').textContent = el('title').value || 'Título profesional';
+      el('pv-contact').textContent = el('contact').value || 'contacto · ciudad';
+      el('pv-summary-text').textContent = el('summary').value || 'Breve resumen profesional.';
+
+      const expList = el('pv-experience-list'); expList.innerHTML = '';
+      Array.from(experiences.children).forEach(n => {
+        const role = n.querySelector('.exp-role').value;
+        const company = n.querySelector('.exp-company').value;
+        const dates = n.querySelector('.exp-dates').value;
+        const desc = n.querySelector('.exp-desc').value;
+        if (!(role||company||dates||desc)) return;
+        const item = document.createElement('div');
+        item.innerHTML = `<div class="item-title">${role} — <span style="font-weight:500">${company}</span></div>
+                          <div class="small">${dates}</div>
+                          <div style="margin-top:6px">${desc}</div>`;
+        expList.appendChild(item);
+      });
+
+      const eduList = el('pv-education-list'); eduList.innerHTML = '';
+      Array.from(educations.children).forEach(n => {
+        const degree = n.querySelector('.edu-degree').value;
+        const school = n.querySelector('.edu-school').value;
+        const dates = n.querySelector('.edu-dates').value;
+        if (!(degree||school||dates)) return;
+        const item = document.createElement('div');
+        item.innerHTML = `<div class="item-title">${degree} — <span style="font-weight:500">${school}</span></div>
+                          <div class="small">${dates}</div>`;
+        eduList.appendChild(item);
+      });
+
+      const skills = (el('skills').value || '').split(',').map(s=>s.trim()).filter(Boolean);
+      el('pv-skills-list').innerHTML = skills.length ? skills.map(s=>`<span style="display:inline-block; background:#eef6ff; color:var(--accent); padding:6px 8px; border-radius:6px; margin:4px; font-size:13px">${s}</span>`).join('') : '<span class="small">Añade tus habilidades separadas por comas.</span>';
+    }
+
+    el('update').onclick = (e) => { e.preventDefault(); updatePreview(); }
+
+    el('print').onclick = (e) => {
+      e.preventDefault();
+      updatePreview();
+      window.print();
+    }
+
+    el('download').onclick = (e) => {
+      e.preventDefault();
+      updatePreview();
+      // generar HTML de la vista previa y descargar
+      const css = Array.from(document.querySelectorAll('style')).map(s=>s.innerHTML).join('\n');
+      const content = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>CV - ${el('name').value||'Curriculum'}</title><style>${css}</style></head><body>${el('preview').innerHTML}</body></html>`;
+      const blob = new Blob([content], {type:'text/html'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `${(el('name').value||'curriculum').replace(/\s+/g,'_')}.html`; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // añadir un par de entradas de ejemplo para empezar
+    experiences.appendChild(makeExperience(++expCount, {role:'Desarrollador Frontend', company:'Empresa S.A.', dates:'2021 - Presente', desc:'Construcción de interfaces, mejora de rendimiento y colaboración con equipo de diseño.'}));
+    educations.appendChild(makeEducation(++eduCount, {degree:'Lic. en Informática', school:'Universidad X', dates:'2015 - 2019'}));
+    updatePreview();
+  </script>
+</body>
+</html>
+// ...existing code...
